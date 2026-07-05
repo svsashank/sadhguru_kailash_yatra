@@ -168,8 +168,22 @@
     max-width:min(240px,60vw); max-height:38vh; object-fit:contain;
     filter:drop-shadow(0 0 24px rgba(232,161,61,.3));
   }
-  #boot p{ font-family:var(--mono); font-size:12px; letter-spacing:.2em;
-    text-transform:uppercase; color:var(--stone); }
+  #boot .load{ width:min(240px,58vw); }
+  #boot .track{
+    height:2px; border-radius:2px; overflow:hidden;
+    background:rgba(242,239,231,.12);
+  }
+  #boot .fill{
+    height:100%; width:0%; border-radius:2px;
+    background:linear-gradient(90deg, #B0492F, #E8A13D, #F2C078);
+    box-shadow:0 0 14px rgba(232,161,61,.55);
+    transition:width .45s cubic-bezier(.25,.6,.3,1);
+  }
+  #boot p{
+    font-family:var(--mono); font-size:10.5px; letter-spacing:.3em;
+    text-transform:uppercase; color:var(--stone);
+    text-align:center; margin-top:12px;
+  }
 
   /* ---------- responsive ---------- */
   @media (max-width: 860px){
@@ -196,7 +210,10 @@
   <img class="adiyogi" src="adiyogi.png" alt="Adiyogi"
        onerror="this.style.display='none';document.getElementById('bootWord').style.display='block'" />
   <div id="bootWord" style="display:none;font-family:var(--display);font-size:30px;letter-spacing:.12em;color:var(--saffron)">KAILASH</div>
-  <p>Loading the mountain</p>
+  <div class="load">
+    <div class="track"><div class="fill" id="bootFill"></div></div>
+    <p>Preparing the route</p>
+  </div>
 </div>
 
 <div id="map" role="application" aria-label="3D map of the 2025 Kailash motorcycle yatra route"></div>
@@ -280,7 +297,9 @@ const STAGES = [
 ];
 
 const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-const bootMsg = document.querySelector('#boot p');
+const bootFill = document.getElementById('bootFill');
+let bootFrac = 0;
+function setBoot(f){ bootFrac = Math.max(bootFrac, f); bootFill.style.width = (bootFrac*100).toFixed(1)+'%'; }
 
 /* ---------- geometry helpers ---------- */
 const R = 6371;
@@ -311,7 +330,7 @@ async function snapAll(){
   const coords=[[ANCHORS[0][0],ANCHORS[0][1]]];
   const anchorIdx=[0];
   for(let k=0;k<ANCHORS.length-1;k++){
-    bootMsg.textContent=`Snapping the route to the road · ${k+1}/${ANCHORS.length-1}`;
+    setBoot(0.08 + 0.82*(k+1)/(ANCHORS.length-1));
     let leg;
     try{ leg=await osrmLeg(ANCHORS[k],ANCHORS[k+1]); }
     catch(e){ leg=[[ANCHORS[k][0],ANCHORS[k][1]],[ANCHORS[k+1][0],ANCHORS[k+1][1]]]; }
@@ -325,7 +344,7 @@ async function resolveRoute(){
   try{
     const r=await fetch('route.json',{cache:'no-cache'});
     if(r.ok){ const j=await r.json();
-      if(j.coords && j.anchorIdx) return j; }
+      if(j.coords && j.anchorIdx){ setBoot(0.9); return j; } }
   }catch(e){}
   try{ return await snapAll(); }
   catch(e){
@@ -405,6 +424,7 @@ const ready={ map:false, route:false };
 
 map.on('load',()=>{
   map.setTerrain({ source:'dem', exaggeration:1.35 });
+  setBoot(0.35);
   ready.map=true; maybeInit();
 });
 
@@ -452,7 +472,8 @@ function maybeInit(){
       .setLngLat([ANCHORS[a][0],ANCHORS[a][1]]).addTo(map);
   });
 
-  document.getElementById('boot').classList.add('gone');
+  setBoot(1);
+  setTimeout(()=>document.getElementById('boot').classList.add('gone'), 450);
   drawProfile(0);
 }
 
