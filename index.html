@@ -164,7 +164,10 @@
     gap:14px; transition:opacity .8s ease;
   }
   #boot.gone{ opacity:0; pointer-events:none; }
-  #boot .adiyogi{ filter:drop-shadow(0 0 18px rgba(232,161,61,.35)); }
+  #boot .adiyogi{
+    max-width:min(240px,60vw); max-height:38vh; object-fit:contain;
+    filter:drop-shadow(0 0 24px rgba(232,161,61,.3));
+  }
   #boot p{ font-family:var(--mono); font-size:12px; letter-spacing:.2em;
     text-transform:uppercase; color:var(--stone); }
 
@@ -190,22 +193,9 @@
 <body>
 
 <div id="boot" aria-hidden="true">
-  <svg class="adiyogi" viewBox="0 0 120 140" width="112" aria-label="Adiyogi">
-    <g fill="none" stroke="#E8A13D" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
-      <path d="M26,52 C26,26 44,14 60,14 C76,14 94,26 94,52"/>
-      <path d="M30,50 C42,42 78,42 90,50"/>
-      <path d="M99,20 a9,9 0 1,0 8,14 a7,7 0 1,1 -8,-14"/>
-      <path d="M28,52 C28,84 38,110 52,122 C56,126 64,126 68,122 C82,110 92,84 92,52"/>
-      <path d="M44,51 L76,51 M46,55.5 L74,55.5"/>
-      <path d="M36,63 C42,57 52,57 56,62"/>
-      <path d="M64,62 C68,57 78,57 84,63"/>
-      <path d="M38,70 C44,75 52,75 56,70"/>
-      <path d="M64,70 C68,75 76,75 82,70"/>
-      <path d="M60,61 L60,88 M52,93 C56,97 64,97 68,93"/>
-      <path d="M48,107 C54,112 66,112 72,107"/>
-      <path d="M52,114 C57,117 63,117 68,114"/>
-    </g>
-  </svg>
+  <img class="adiyogi" src="adiyogi.png" alt="Adiyogi"
+       onerror="this.style.display='none';document.getElementById('bootWord').style.display='block'" />
+  <div id="bootWord" style="display:none;font-family:var(--display);font-size:30px;letter-spacing:.12em;color:var(--saffron)">KAILASH</div>
   <p>Loading the mountain</p>
 </div>
 
