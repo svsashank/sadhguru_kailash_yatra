@@ -225,69 +225,56 @@
 <script>
 /* ============================================================
    KAILASH BY ROAD — 2025 route replay
-   Route is a hand-plotted approximation of the ridden highways.
-   To use exact GPX later: replace ROUTE with [lng, lat, ele] rows.
+   Route geometry is snapped to real roads via OSRM (OpenStreetMap).
+   Load order: route.json (baked) -> live OSRM snap -> straight lines.
    ============================================================ */
 
-const ROUTE = [
-  // --- India: Gorakhpur -> Sunauli (NH-727) ---
-  [83.3732,26.7606,84],[83.3550,26.8600,86],[83.3050,26.9900,88],
-  [83.2950,27.1300,92],[83.3200,27.2600,95],[83.3600,27.3900,98],
-  [83.4000,27.4600,100],[83.4163,27.5057,100],
-  // --- Nepal border: Bhairahawa -> Butwal ---
-  [83.4509,27.5330,109],[83.4480,27.6200,125],[83.4484,27.7006,150],
-  // --- East along H01 to Narayanghat, monsoon stretch ---
-  [83.5600,27.6900,180],[83.7200,27.6700,195],[83.8800,27.6500,200],
-  [84.0500,27.6350,205],[84.2200,27.6500,210],[84.3500,27.6700,215],
-  [84.4300,27.6900,208],
-  // --- Trishuli valley: Narayanghat -> Mugling -> Kathmandu ---
-  [84.4800,27.7800,235],[84.5630,27.8570,240],[84.6500,27.8700,300],
-  [84.8300,27.8100,415],[84.9800,27.8300,520],[85.0900,27.8000,720],
-  [85.1500,27.7700,940],[85.2000,27.6900,1500],[85.3240,27.7172,1350],
-  // --- Valley towns ---
-  [85.4298,27.6710,1400],[85.5417,27.6221,1550],
-  // --- Araniko Highway: down to Sun Koshi, up the Bhote Koshi gorge ---
-  [85.6300,27.6350,900],[85.7100,27.6400,650],[85.7700,27.7300,760],
-  [85.8300,27.7800,820],[85.9000,27.7900,900],[85.9300,27.8800,1250],
-  [85.9610,27.9737,1770],
-  // --- Zhangmu border post, the climb to Nyalam ---
-  [85.9800,27.9910,2300],[85.9700,28.0600,3000],[85.9820,28.1550,3750],
-  // --- Onto the plateau: Tong La country, Peiku Tso ---
-  [85.9800,28.3500,4800],[85.8500,28.5500,5050],[85.6500,28.7500,4600],
-  [85.6000,28.9000,4590],[85.3500,29.1000,4620],[85.2500,29.2500,4630],
-  // --- Saga ---
-  [85.2325,29.3288,4640],
-  // --- West along G219: Zhongba, Paryang ---
-  [84.9000,29.4500,4700],[84.5500,29.6000,4600],[84.2500,29.7000,4580],
-  [84.0300,29.7700,4570],[83.7500,29.9000,4590],[83.4500,30.0700,4610],
-  // --- Mayum La, the high point ---
-  [83.0500,30.2000,4750],[82.6500,30.3000,4800],[82.3000,30.4700,5216],
-  // --- Descent to the lake ---
-  [81.9500,30.6200,4700],[81.7500,30.7500,4560],[81.5500,30.7200,4585],
-  // --- Lake Manasarovar (Chiu side), then Darchen beneath Kailash ---
-  [81.3000,30.7800,4590],[81.2900,30.9800,4675]
+/* Anchors: [lng, lat, elevation_m] — the waypoints the ride passed through.
+   OSRM fills in the road between them. */
+const ANCHORS = [
+  [83.3732, 26.7606,   84],  // 0  Gorakhpur
+  [83.4163, 27.5057,  100],  // 1  Sunauli border
+  [83.4484, 27.7006,  150],  // 2  Butwal
+  [84.4300, 27.6900,  208],  // 3  Narayanghat
+  [84.5630, 27.8570,  240],  // 4  Mugling
+  [85.3240, 27.7172, 1350],  // 5  Kathmandu
+  [85.4298, 27.6710, 1400],  // 6  Bhaktapur
+  [85.5417, 27.6221, 1550],  // 7  Dhulikhel
+  [85.9000, 27.7900,  900],  // 8  Barhabise
+  [85.9610, 27.9737, 1770],  // 9  Kodari
+  [85.9800, 27.9910, 2300],  // 10 Zhangmu
+  [85.9820, 28.1550, 3750],  // 11 Nyalam
+  [85.8500, 28.5500, 5050],  // 12 Tong La country
+  [85.6000, 28.9000, 4590],  // 13 Peiku Tso
+  [85.2325, 29.3288, 4640],  // 14 Saga
+  [84.0300, 29.7700, 4570],  // 15 Zhongba
+  [83.4500, 30.0700, 4610],  // 16 Paryang
+  [82.3000, 30.4700, 5216],  // 17 Mayum La
+  [81.7500, 30.7500, 4560],  // 18 Hor
+  [81.3000, 30.7800, 4590],  // 19 Lake Manasarovar (Chiu)
+  [81.2900, 30.9800, 4675]   // 20 Darchen
 ];
 
 const STAGES = [
-  { i:0,  alt:'84 M · AUG 9',    name:'Gorakhpur',          note:'Flag-off from the Uttar Pradesh plains.', zoom:10.5, pitch:55, bearing:0 },
-  { i:7,  alt:'100 M',           name:'Sunauli — Bhairahawa', note:'Crossing into Nepal at the land border.', zoom:11, pitch:55, bearing:10 },
-  { i:10, alt:'150 M',           name:'Butwal',             note:'Rain-soaked, under-construction monsoon roads begin.', zoom:11, pitch:58, bearing:60 },
-  { i:18, alt:'240 M',           name:'Mugling',            note:'Up the Trishuli valley on the Prithvi Highway.', zoom:10.8, pitch:60, bearing:70 },
-  { i:25, alt:'1,350 M',         name:'Kathmandu',          note:'Through the capital and the valley.', zoom:11.2, pitch:55, bearing:90 },
-  { i:27, alt:'1,550 M',         name:'Bhaktapur — Dhulikhel', note:'The old towns at the valley rim.', zoom:11.5, pitch:58, bearing:80 },
-  { i:33, alt:'1,770 M',         name:'Bhote Koshi Gorge',  note:'The Araniko Highway climbs a monsoon gorge to the frontier.', zoom:10.8, pitch:62, bearing:20 },
-  { i:34, alt:'2,300 M',         name:'Zhangmu',            note:'Entering Tibet by road — no flights, no helicopters.', zoom:11.5, pitch:62, bearing:0 },
-  { i:36, alt:'3,750 M',         name:'Nyalam',             note:'The wall of the Himalaya, climbed in switchbacks.', zoom:10.8, pitch:63, bearing:355 },
-  { i:38, alt:'5,050 M',         name:'Tong La',            note:'Onto the plateau. Thin air, open sky.', zoom:9.8, pitch:60, bearing:320 },
-  { i:43, alt:'4,640 M',         name:'Saga',               note:'Across the Yarlung Tsangpo, west along G219.', zoom:10.2, pitch:58, bearing:290 },
-  { i:49, alt:'4,610 M',         name:'Paryang',            note:'The long plateau run.', zoom:9.8, pitch:58, bearing:285 },
-  { i:52, alt:'5,216 M',         name:'Mayum La',           note:'The highest point of the ride.', zoom:10, pitch:62, bearing:290 },
-  { i:56, alt:'4,590 M',         name:'Lake Manasarovar',   note:'The ride concludes at the lake.', zoom:10.5, pitch:60, bearing:300 },
-  { i:57, alt:'4,675 M',         name:'Darchen · Kailash',  note:'Beneath the mountain. The trek begins where the road ends.', zoom:10.8, pitch:65, bearing:340 }
+  { a:0,  alt:'84 M · AUG 9', name:'Gorakhpur',            note:'Flag-off from the Uttar Pradesh plains.', zoom:10.5, pitch:55, bearing:0 },
+  { a:1,  alt:'100 M',        name:'Sunauli — Bhairahawa', note:'Crossing into Nepal at the land border.', zoom:11, pitch:55, bearing:10 },
+  { a:2,  alt:'150 M',        name:'Butwal',               note:'Rain-soaked, under-construction monsoon roads begin.', zoom:11, pitch:58, bearing:60 },
+  { a:4,  alt:'240 M',        name:'Mugling',              note:'Up the Trishuli valley on the Prithvi Highway.', zoom:10.8, pitch:60, bearing:70 },
+  { a:5,  alt:'1,350 M',      name:'Kathmandu',            note:'Through the capital and the valley.', zoom:11.2, pitch:55, bearing:90 },
+  { a:7,  alt:'1,550 M',      name:'Bhaktapur — Dhulikhel', note:'The old towns at the valley rim.', zoom:11.5, pitch:58, bearing:80 },
+  { a:9,  alt:'1,770 M',      name:'Bhote Koshi Gorge',    note:'The Araniko Highway climbs a monsoon gorge to the frontier.', zoom:10.8, pitch:62, bearing:20 },
+  { a:10, alt:'2,300 M',      name:'Zhangmu',              note:'Entering Tibet by road — no flights, no helicopters.', zoom:11.5, pitch:62, bearing:0 },
+  { a:11, alt:'3,750 M',      name:'Nyalam',               note:'The wall of the Himalaya, climbed in switchbacks.', zoom:10.8, pitch:63, bearing:355 },
+  { a:12, alt:'5,050 M',      name:'Tong La',              note:'Onto the plateau. Thin air, open sky.', zoom:9.8, pitch:60, bearing:320 },
+  { a:14, alt:'4,640 M',      name:'Saga',                 note:'Across the Yarlung Tsangpo, west along G219.', zoom:10.2, pitch:58, bearing:290 },
+  { a:16, alt:'4,610 M',      name:'Paryang',              note:'The long plateau run.', zoom:9.8, pitch:58, bearing:285 },
+  { a:17, alt:'5,216 M',      name:'Mayum La',             note:'The highest point of the ride.', zoom:10, pitch:62, bearing:290 },
+  { a:19, alt:'4,590 M',      name:'Lake Manasarovar',     note:'The ride concludes at the lake.', zoom:10.5, pitch:60, bearing:300 },
+  { a:20, alt:'4,675 M',      name:'Darchen · Kailash',    note:'Beneath the mountain. The trek begins where the road ends.', zoom:10.8, pitch:65, bearing:340 }
 ];
 
-const PLACES = STAGES.map(s => ({ i:s.i, name:s.name }));
 const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+const bootMsg = document.querySelector('#boot p');
 
 /* ---------- geometry helpers ---------- */
 const R = 6371;
@@ -303,24 +290,76 @@ function bearing(a, b){
   const x=Math.cos(la1)*Math.sin(la2)-Math.sin(la1)*Math.cos(la2)*Math.cos(dLng);
   return (Math.atan2(y,x)*180/Math.PI+360)%360;
 }
-const CUM=[0];
-for(let i=1;i<ROUTE.length;i++) CUM.push(CUM[i-1]+hav(ROUTE[i-1],ROUTE[i]));
-const TOTAL=CUM[CUM.length-1];
+
+/* ---------- route resolution: baked file -> live OSRM -> straight ---------- */
+const OSRM='https://router.project-osrm.org/route/v1/driving/';
+
+async function osrmLeg(a, b){
+  const url=OSRM+`${a[0]},${a[1]};${b[0]},${b[1]}?overview=full&geometries=geojson&steps=false`;
+  const r=await fetch(url); if(!r.ok) throw new Error('osrm '+r.status);
+  const j=await r.json(); if(j.code!=='Ok') throw new Error(j.code);
+  return j.routes[0].geometry.coordinates;
+}
+
+async function snapAll(){
+  const coords=[[ANCHORS[0][0],ANCHORS[0][1]]];
+  const anchorIdx=[0];
+  for(let k=0;k<ANCHORS.length-1;k++){
+    bootMsg.textContent=`Snapping the route to the road · ${k+1}/${ANCHORS.length-1}`;
+    let leg;
+    try{ leg=await osrmLeg(ANCHORS[k],ANCHORS[k+1]); }
+    catch(e){ leg=[[ANCHORS[k][0],ANCHORS[k][1]],[ANCHORS[k+1][0],ANCHORS[k+1][1]]]; }
+    for(let i=1;i<leg.length;i++) coords.push(leg[i]);
+    anchorIdx.push(coords.length-1);
+  }
+  return { coords, anchorIdx };
+}
+
+async function resolveRoute(){
+  try{
+    const r=await fetch('route.json',{cache:'no-cache'});
+    if(r.ok){ const j=await r.json();
+      if(j.coords && j.anchorIdx) return j; }
+  }catch(e){}
+  try{ return await snapAll(); }
+  catch(e){
+    return { coords:ANCHORS.map(p=>[p[0],p[1]]), anchorIdx:ANCHORS.map((_,i)=>i) };
+  }
+}
+
+/* ---------- fine route + elevation model (filled after resolve) ---------- */
+let ROUTE=[], CUM=[0], TOTAL=1, ANCHOR_CUM=[], PROF=[];
+
+function buildFine(res){
+  const {coords, anchorIdx}=res;
+  CUM=[0];
+  for(let i=1;i<coords.length;i++) CUM.push(CUM[i-1]+hav(coords[i-1],coords[i]));
+  TOTAL=CUM[CUM.length-1];
+  ANCHOR_CUM=anchorIdx.map(i=>CUM[i]);
+  // interpolate anchor elevations along each snapped leg by distance
+  ROUTE=coords.map((c,i)=>{
+    let k=1; while(k<anchorIdx.length-1 && anchorIdx[k]<i) k++;
+    const d0=CUM[anchorIdx[k-1]], d1=CUM[anchorIdx[k]];
+    const t=d1>d0 ? (CUM[i]-d0)/(d1-d0) : 0;
+    const ele=ANCHORS[k-1][2]+(ANCHORS[k][2]-ANCHORS[k-1][2])*Math.max(0,Math.min(1,t));
+    return [c[0],c[1],ele];
+  });
+  // decimated elevation profile for the ribbon (fast to redraw every frame)
+  PROF=[];
+  const N=320;
+  for(let s=0;s<=N;s++){ const d=TOTAL*s/N; const p=pointAt(d); PROF.push([d,p.ele]); }
+}
 
 function pointAt(d){
   d=Math.max(0,Math.min(TOTAL,d));
-  let i=1; while(i<CUM.length-1 && CUM[i]<d) i++;
-  const t=(d-CUM[i-1])/((CUM[i]-CUM[i-1])||1e-9);
-  const a=ROUTE[i-1], b=ROUTE[i];
+  let lo=0, hi=CUM.length-1;
+  while(hi-lo>1){ const m=(lo+hi)>>1; (CUM[m]<=d)?lo=m:hi=m; }
+  const t=(d-CUM[lo])/((CUM[hi]-CUM[lo])||1e-9);
+  const a=ROUTE[lo], b=ROUTE[hi];
   return {
     lng:a[0]+(b[0]-a[0])*t, lat:a[1]+(b[1]-a[1])*t,
-    ele:a[2]+(b[2]-a[2])*t, brg:bearing(a,b), seg:i
+    ele:a[2]+(b[2]-a[2])*t, brg:bearing(a,b)
   };
-}
-function nearestPlace(seg){
-  let best=PLACES[0];
-  for(const p of PLACES){ if(p.i<=seg) best=p; }
-  return best.name;
 }
 
 /* ---------- map ---------- */
@@ -334,7 +373,7 @@ const map = new maplibregl.Map({
       sat:{
         type:'raster', tileSize:256, maxzoom:17,
         tiles:['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'],
-        attribution:'Imagery © Esri, Maxar, Earthstar Geographics · Terrain © Mapzen/AWS'
+        attribution:'Imagery © Esri, Maxar, Earthstar Geographics · Terrain © Mapzen/AWS · Routing © OSRM/OpenStreetMap'
       },
       dem:{
         type:'raster-dem', tileSize:256, maxzoom:13, encoding:'terrarium',
@@ -355,10 +394,19 @@ const map = new maplibregl.Map({
 });
 map.addControl(new maplibregl.NavigationControl({visualizePitch:true}),'bottom-right');
 
-let rider;
+let rider, inited=false;
+const ready={ map:false, route:false };
 
 map.on('load',()=>{
   map.setTerrain({ source:'dem', exaggeration:1.35 });
+  ready.map=true; maybeInit();
+});
+
+resolveRoute().then(res=>{ buildFine(res); ready.route=true; maybeInit(); });
+
+function maybeInit(){
+  if(!ready.map || !ready.route || inited) return;
+  inited=true;
 
   map.addSource('route',{
     type:'geojson', lineMetrics:true,
@@ -373,22 +421,20 @@ map.on('load',()=>{
     paint:{ 'line-width':4,
       'line-gradient':['step',['line-progress'],'#E8A13D',0.0001,'rgba(232,161,61,0.18)'] } });
 
-  // rider marker
   const el=document.createElement('div'); el.className='rider';
   el.innerHTML='<div class="pulse"></div><div class="core"></div>';
   rider=new maplibregl.Marker({element:el}).setLngLat([ROUTE[0][0],ROUTE[0][1]]).addTo(map);
 
-  // waypoint labels (key anchors only, to keep the map quiet)
-  [0,7,25,34,36,43,52,56,57].forEach(i=>{
-    const s=STAGES.find(x=>x.i===i); if(!s) return;
+  [0,5,10,11,14,17,19,20].forEach(a=>{
+    const s=STAGES.find(x=>x.a===a); if(!s) return;
     const w=document.createElement('div'); w.className='waypt'; w.textContent=s.name.toUpperCase();
     new maplibregl.Marker({element:w, anchor:'left', offset:[10,0]})
-      .setLngLat([ROUTE[i][0],ROUTE[i][1]]).addTo(map);
+      .setLngLat([ANCHORS[a][0],ANCHORS[a][1]]).addTo(map);
   });
 
   document.getElementById('boot').classList.add('gone');
   drawProfile(0);
-});
+}
 
 /* ---------- stage rail ---------- */
 const rail=document.getElementById('rail');
@@ -396,7 +442,7 @@ STAGES.forEach((s,idx)=>{
   const b=document.createElement('button');
   b.className='stage'; b.dataset.idx=idx;
   b.innerHTML=`<div class="alt">${s.alt}</div><div class="name">${s.name}</div><div class="note">${s.note}</div>`;
-  b.addEventListener('click',()=>goToStage(idx,true));
+  b.addEventListener('click',()=>goToStage(idx));
   rail.appendChild(b);
 });
 function setActiveStage(idx){
@@ -404,15 +450,16 @@ function setActiveStage(idx){
 }
 function stageForDist(d){
   let idx=0;
-  STAGES.forEach((s,k)=>{ if(CUM[s.i]<=d+0.5) idx=k; });
+  STAGES.forEach((s,k)=>{ if(ANCHOR_CUM[s.a]<=d+0.5) idx=k; });
   return idx;
 }
-function goToStage(idx,userInitiated){
+function goToStage(idx){
+  if(!inited) return;
   stopRide();
   const s=STAGES[idx];
   setActiveStage(idx);
-  setProgress(CUM[s.i]);
-  const opts={ center:[ROUTE[s.i][0],ROUTE[s.i][1]], zoom:s.zoom, pitch:s.pitch, bearing:s.bearing };
+  setProgress(ANCHOR_CUM[s.a]);
+  const opts={ center:[ANCHORS[s.a][0],ANCHORS[s.a][1]], zoom:s.zoom, pitch:s.pitch, bearing:s.bearing };
   if(reduceMotion){ map.jumpTo(opts); } else { map.flyTo({...opts, duration:2600, essential:true}); }
 }
 
@@ -429,7 +476,7 @@ function setProgress(d){
     ['step',['line-progress'],'#E8A13D',frac,'rgba(232,161,61,0.18)']);
   if(rider) rider.setLngLat([p.lng,p.lat]);
   altVal.textContent=Math.round(p.ele).toLocaleString('en-IN');
-  placeVal.textContent=nearestPlace(p.seg);
+  placeVal.textContent=STAGES[stageForDist(d)].name;
   drawProfile(frac);
   return p;
 }
@@ -439,7 +486,7 @@ const rideBtn=document.getElementById('rideBtn');
 const rideGlyph=document.getElementById('rideGlyph');
 const rideLabel=document.getElementById('rideLabel');
 let riding=false, raf=null, lastT=null, smoothBrg=null;
-const KM_PER_SEC=6.5;               // ~3.5 min end to end
+const KM_PER_SEC=6.5;
 
 function stepRide(t){
   if(!riding) return;
@@ -448,7 +495,6 @@ function stepRide(t){
   let d=currentDist+dt*KM_PER_SEC;
   if(d>=TOTAL){ d=TOTAL; }
   const p=setProgress(d);
-  // smooth the bearing so gorge switchbacks don't whip the camera
   if(smoothBrg===null) smoothBrg=p.brg;
   let diff=((p.brg-smoothBrg+540)%360)-180;
   smoothBrg=(smoothBrg+diff*Math.min(1,dt*1.4)+360)%360;
@@ -464,9 +510,9 @@ function stepRide(t){
   raf=requestAnimationFrame(stepRide);
 }
 function startRide(){
-  if(reduceMotion){                  // no continuous camera motion: step stages
-    const next=(stageForDist(currentDist)+1)%STAGES.length;
-    goToStage(next,false); return;
+  if(!inited) return;
+  if(reduceMotion){
+    goToStage((stageForDist(currentDist)+1)%STAGES.length); return;
   }
   if(currentDist>=TOTAL) setProgress(0);
   riding=true; lastT=null; smoothBrg=null;
@@ -485,6 +531,7 @@ rideBtn.addEventListener('click',()=>{ riding?stopRide():startRide(); });
 const canvas=document.getElementById('profile');
 const ctx=canvas.getContext('2d');
 function drawProfile(frac){
+  if(!PROF.length) return;
   const dpr=window.devicePixelRatio||1;
   const w=canvas.clientWidth, h=canvas.clientHeight;
   if(canvas.width!==w*dpr){ canvas.width=w*dpr; canvas.height=h*dpr; }
@@ -494,23 +541,20 @@ function drawProfile(frac){
   const X=d=>pad+(d/TOTAL)*(w-2*pad);
   const Y=e=>h-4-(e/maxE)*(h-10);
 
-  // full profile, quiet
-  ctx.beginPath(); ctx.moveTo(X(0),Y(ROUTE[0][2]));
-  for(let i=1;i<ROUTE.length;i++) ctx.lineTo(X(CUM[i]),Y(ROUTE[i][2]));
+  ctx.beginPath(); ctx.moveTo(X(PROF[0][0]),Y(PROF[0][1]));
+  for(let i=1;i<PROF.length;i++) ctx.lineTo(X(PROF[i][0]),Y(PROF[i][1]));
   ctx.strokeStyle='rgba(242,239,231,0.28)'; ctx.lineWidth=1.5; ctx.stroke();
 
-  // ridden portion, saffron fill
   const dNow=frac*TOTAL;
   ctx.beginPath(); ctx.moveTo(X(0),h);
-  ctx.lineTo(X(0),Y(ROUTE[0][2]));
-  for(let i=1;i<ROUTE.length && CUM[i]<=dNow;i++) ctx.lineTo(X(CUM[i]),Y(ROUTE[i][2]));
+  ctx.lineTo(X(PROF[0][0]),Y(PROF[0][1]));
+  for(let i=1;i<PROF.length && PROF[i][0]<=dNow;i++) ctx.lineTo(X(PROF[i][0]),Y(PROF[i][1]));
   const pNow=pointAt(dNow);
   ctx.lineTo(X(dNow),Y(pNow.ele)); ctx.lineTo(X(dNow),h); ctx.closePath();
   const g=ctx.createLinearGradient(0,0,0,h);
   g.addColorStop(0,'rgba(232,161,61,0.55)'); g.addColorStop(1,'rgba(232,161,61,0.08)');
   ctx.fillStyle=g; ctx.fill();
 
-  // position tick
   ctx.beginPath(); ctx.arc(X(dNow),Y(pNow.ele),3.5,0,7);
   ctx.fillStyle='#E8A13D'; ctx.fill();
   ctx.lineWidth=1.5; ctx.strokeStyle='#0B1220'; ctx.stroke();

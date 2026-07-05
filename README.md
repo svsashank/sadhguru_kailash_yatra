@@ -22,12 +22,23 @@ Push the folder to any static host:
 
 ## Route accuracy
 
-The route is a hand-plotted approximation (~60 points) of the actual highways
-(NH-727, Prithvi Hwy, Araniko Hwy, G219). At flythrough zoom this reads correctly.
-For road-exact geometry, replace the `ROUTE` array in `index.html` with rows of
-`[lng, lat, elevation_m]` from a GPX/OSRM trace — everything else (camera, ribbon,
-stages) recomputes automatically. Stage anchors reference route indices via
-`STAGES[n].i`, so re-anchor those after swapping.
+The route is snapped to real roads via OSRM (OpenStreetMap routing), leg by leg
+between 21 anchor waypoints. Resolution order on page load:
+
+1. `route.json` if committed (baked geometry — preferred for production)
+2. Live OSRM snap in the browser (~20 quick requests, cached fallback per leg)
+3. Straight anchor-to-anchor lines if OSRM is unreachable
+
+**Bake it for production** (one command, then commit the output):
+
+```
+node build-route.mjs
+git add route.json && git commit -m "bake road geometry" && git push
+```
+
+If OSM can't route a leg (e.g. the closed Kodari–Zhangmu border crossing), that
+single short leg falls back to a straight line — everything else stays road-exact.
+Elevations are interpolated between anchor altitudes along each leg.
 
 ## Next layers (2026 live mode)
 
