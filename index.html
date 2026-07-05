@@ -131,14 +131,15 @@
   }
 
   /* ---------- rider marker ---------- */
-  .rider{ width:18px; height:18px; position:relative; }
-  .rider .core{
-    position:absolute; inset:4px; border-radius:50%;
-    background:var(--saffron); border:2px solid var(--ink);
+  .rider{
+    width:24px; height:48px; position:relative;
+    filter:drop-shadow(0 2px 7px rgba(0,0,0,.65));
   }
+  .rider svg{ position:relative; z-index:1; display:block; }
   .rider .pulse{
-    position:absolute; inset:0; border-radius:50%;
-    border:2px solid var(--saffron); opacity:.9;
+    position:absolute; left:50%; top:50%; z-index:0;
+    width:34px; height:34px; margin:-17px 0 0 -17px; border-radius:50%;
+    border:2px solid var(--saffron); opacity:.85;
     animation:pulse 2.2s ease-out infinite;
   }
   @keyframes pulse{
@@ -163,7 +164,7 @@
     gap:14px; transition:opacity .8s ease;
   }
   #boot.gone{ opacity:0; pointer-events:none; }
-  #boot .om{ font-family:var(--display); font-size:44px; color:var(--saffron); }
+  #boot .adiyogi{ filter:drop-shadow(0 0 18px rgba(232,161,61,.35)); }
   #boot p{ font-family:var(--mono); font-size:12px; letter-spacing:.2em;
     text-transform:uppercase; color:var(--stone); }
 
@@ -189,7 +190,22 @@
 <body>
 
 <div id="boot" aria-hidden="true">
-  <div class="om">ॐ</div>
+  <svg class="adiyogi" viewBox="0 0 120 140" width="112" aria-label="Adiyogi">
+    <g fill="none" stroke="#E8A13D" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M26,52 C26,26 44,14 60,14 C76,14 94,26 94,52"/>
+      <path d="M30,50 C42,42 78,42 90,50"/>
+      <path d="M99,20 a9,9 0 1,0 8,14 a7,7 0 1,1 -8,-14"/>
+      <path d="M28,52 C28,84 38,110 52,122 C56,126 64,126 68,122 C82,110 92,84 92,52"/>
+      <path d="M44,51 L76,51 M46,55.5 L74,55.5"/>
+      <path d="M36,63 C42,57 52,57 56,62"/>
+      <path d="M64,62 C68,57 78,57 84,63"/>
+      <path d="M38,70 C44,75 52,75 56,70"/>
+      <path d="M64,70 C68,75 76,75 82,70"/>
+      <path d="M60,61 L60,88 M52,93 C56,97 64,97 68,93"/>
+      <path d="M48,107 C54,112 66,112 72,107"/>
+      <path d="M52,114 C57,117 63,117 68,114"/>
+    </g>
+  </svg>
   <p>Loading the mountain</p>
 </div>
 
@@ -422,8 +438,22 @@ function maybeInit(){
       'line-gradient':['step',['line-progress'],'#E8A13D',0.0001,'rgba(232,161,61,0.18)'] } });
 
   const el=document.createElement('div'); el.className='rider';
-  el.innerHTML='<div class="pulse"></div><div class="core"></div>';
-  rider=new maplibregl.Marker({element:el}).setLngLat([ROUTE[0][0],ROUTE[0][1]]).addTo(map);
+  el.innerHTML=`<div class="pulse"></div>
+    <svg viewBox="0 0 24 48" width="24" height="48" aria-label="Motorcycle">
+      <rect x="9" y="1.5" width="6" height="10" rx="3" fill="#141922"/>
+      <rect x="9" y="36.5" width="6" height="10" rx="3" fill="#141922"/>
+      <rect x="3.2" y="11.5" width="17.6" height="2.6" rx="1.3" fill="#2A3140"/>
+      <path d="M8.4,14 h7.2 l1.2,6 v14 a4.8,4.8 0 0 1 -9.6,0 v-14 z" fill="#CC2B1D"/>
+      <path d="M9,10 h6 l-0.9,4 h-4.2 z" fill="#8FA3BF" opacity="0.85"/>
+      <rect x="1.6" y="27" width="4.6" height="10" rx="2" fill="#232A38"/>
+      <rect x="17.8" y="27" width="4.6" height="10" rx="2" fill="#232A38"/>
+      <rect x="7.6" y="24" width="8.8" height="9.5" rx="3.6" fill="#39424F"/>
+      <circle cx="12" cy="21.5" r="4" fill="#E8A13D"/>
+      <circle cx="12" cy="3.5" r="1.2" fill="#F2EFE7"/>
+    </svg>`;
+  rider=new maplibregl.Marker({
+    element:el, rotationAlignment:'map', pitchAlignment:'map'
+  }).setLngLat([ROUTE[0][0],ROUTE[0][1]]).addTo(map);
 
   [0,5,10,11,14,17,19,20].forEach(a=>{
     const s=STAGES.find(x=>x.a===a); if(!s) return;
@@ -474,7 +504,7 @@ function setProgress(d){
   const frac=Math.max(0.0001, d/TOTAL);
   map.setPaintProperty('route-line','line-gradient',
     ['step',['line-progress'],'#E8A13D',frac,'rgba(232,161,61,0.18)']);
-  if(rider) rider.setLngLat([p.lng,p.lat]);
+  if(rider){ rider.setLngLat([p.lng,p.lat]); rider.setRotation(p.brg); }
   altVal.textContent=Math.round(p.ele).toLocaleString('en-IN');
   placeVal.textContent=STAGES[stageForDist(d)].name;
   drawProfile(frac);
@@ -486,25 +516,56 @@ const rideBtn=document.getElementById('rideBtn');
 const rideGlyph=document.getElementById('rideGlyph');
 const rideLabel=document.getElementById('rideLabel');
 let riding=false, raf=null, lastT=null, smoothBrg=null;
+let camPos=null, pitchS=null, zoomS=null, speedS=null;
 const KM_PER_SEC=6.5;
+const LOOKAHEAD=0.6;        // km the camera "eyes" look up the road
+const MAX_TURN=55;          // deg/sec cap on camera rotation
+
+function angDiff(a,b){ return ((a-b+540)%360)-180; }
 
 function stepRide(t){
   if(!riding) return;
-  if(lastT===null) lastT=t;
-  const dt=(t-lastT)/1000; lastT=t;
-  let d=currentDist+dt*KM_PER_SEC;
-  if(d>=TOTAL){ d=TOTAL; }
+  if(lastT===null){ lastT=t; raf=requestAnimationFrame(stepRide); return; }
+  const dt=Math.min(0.1,(t-lastT)/1000); lastT=t;
+
+  // corner braking: slow down when the road ahead bends hard
+  const here=pointAt(currentDist);
+  const near=pointAt(Math.min(TOTAL,currentDist+0.35));
+  const turnAhead=Math.abs(angDiff(near.brg,here.brg));
+  const targetSpeed=KM_PER_SEC*Math.max(0.35, 1-turnAhead/130);
+  if(speedS===null) speedS=KM_PER_SEC;
+  speedS+=(targetSpeed-speedS)*Math.min(1,dt*2.2);
+
+  let d=currentDist+dt*speedS;
+  if(d>=TOTAL) d=TOTAL;
   const p=setProgress(d);
-  if(smoothBrg===null) smoothBrg=p.brg;
-  let diff=((p.brg-smoothBrg+540)%360)-180;
-  smoothBrg=(smoothBrg+diff*Math.min(1,dt*1.4)+360)%360;
-  const highPlateau=p.ele>4200;
-  map.jumpTo({
-    center:[p.lng,p.lat],
-    bearing:smoothBrg,
-    pitch:highPlateau?58:64,
-    zoom:highPlateau?10.2:11.3
-  });
+
+  // look-ahead bearing: aim at a point up the road, not the local segment
+  let brgT=p.brg;
+  if(d+0.05<TOTAL){
+    const look=pointAt(Math.min(TOTAL,d+LOOKAHEAD));
+    brgT=bearing([p.lng,p.lat],[look.lng,look.lat]);
+  }
+  if(smoothBrg===null) smoothBrg=brgT;
+  let dB=angDiff(brgT,smoothBrg)*Math.min(1,dt*1.8);
+  const cap=MAX_TURN*dt;
+  dB=Math.max(-cap,Math.min(cap,dB));
+  smoothBrg=(smoothBrg+dB+360)%360;
+
+  // camera trails the bike on a damped spring
+  if(camPos===null) camPos={lng:p.lng,lat:p.lat};
+  const k=Math.min(1,dt*3.2);
+  camPos.lng+=(p.lng-camPos.lng)*k;
+  camPos.lat+=(p.lat-camPos.lat)*k;
+
+  // pitch/zoom ease between gorge and plateau framing
+  const high=p.ele>4200;
+  const pT=high?58:64, zT=high?10.2:11.3;
+  if(pitchS===null){ pitchS=pT; zoomS=zT; }
+  pitchS+=(pT-pitchS)*Math.min(1,dt*0.8);
+  zoomS+=(zT-zoomS)*Math.min(1,dt*0.8);
+
+  map.jumpTo({ center:[camPos.lng,camPos.lat], bearing:smoothBrg, pitch:pitchS, zoom:zoomS });
   setActiveStage(stageForDist(d));
   if(d>=TOTAL){ stopRide(); return; }
   raf=requestAnimationFrame(stepRide);
@@ -516,6 +577,7 @@ function startRide(){
   }
   if(currentDist>=TOTAL) setProgress(0);
   riding=true; lastT=null; smoothBrg=null;
+  camPos=null; pitchS=null; zoomS=null; speedS=null;
   rideGlyph.textContent='❚❚'; rideLabel.textContent='Pause';
   rideBtn.setAttribute('aria-pressed','true');
   raf=requestAnimationFrame(stepRide);
