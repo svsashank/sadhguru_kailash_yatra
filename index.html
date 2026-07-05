@@ -132,13 +132,13 @@
 
   /* ---------- rider marker ---------- */
   .rider{
-    width:24px; height:48px; position:relative;
-    filter:drop-shadow(0 2px 7px rgba(0,0,0,.65));
+    width:30px; height:60px; position:relative;
+    filter:drop-shadow(0 1px 6px rgba(0,0,0,.55));
   }
   .rider svg{ position:relative; z-index:1; display:block; }
   .rider .pulse{
     position:absolute; left:50%; top:50%; z-index:0;
-    width:34px; height:34px; margin:-17px 0 0 -17px; border-radius:50%;
+    width:30px; height:30px; margin:-15px 0 0 -15px; border-radius:50%;
     border:2px solid var(--saffron); opacity:.85;
     animation:pulse 2.2s ease-out infinite;
   }
@@ -449,17 +449,16 @@ function maybeInit(){
 
   const el=document.createElement('div'); el.className='rider';
   el.innerHTML=`<div class="pulse"></div>
-    <svg viewBox="0 0 24 48" width="24" height="48" aria-label="Motorcycle">
-      <rect x="9" y="1.5" width="6" height="10" rx="3" fill="#141922"/>
-      <rect x="9" y="36.5" width="6" height="10" rx="3" fill="#141922"/>
-      <rect x="3.2" y="11.5" width="17.6" height="2.6" rx="1.3" fill="#2A3140"/>
-      <path d="M8.4,14 h7.2 l1.2,6 v14 a4.8,4.8 0 0 1 -9.6,0 v-14 z" fill="#CC2B1D"/>
-      <path d="M9,10 h6 l-0.9,4 h-4.2 z" fill="#8FA3BF" opacity="0.85"/>
-      <rect x="1.6" y="27" width="4.6" height="10" rx="2" fill="#232A38"/>
-      <rect x="17.8" y="27" width="4.6" height="10" rx="2" fill="#232A38"/>
-      <rect x="7.6" y="24" width="8.8" height="9.5" rx="3.6" fill="#39424F"/>
-      <circle cx="12" cy="21.5" r="4" fill="#E8A13D"/>
-      <circle cx="12" cy="3.5" r="1.2" fill="#F2EFE7"/>
+    <svg viewBox="0 0 44 88" width="30" height="60" aria-label="Rider position">
+      <defs>
+        <linearGradient id="beam" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#E8A13D" stop-opacity="0"/>
+          <stop offset="1" stop-color="#E8A13D" stop-opacity="0.5"/>
+        </linearGradient>
+      </defs>
+      <path d="M22,6 L31.5,40 A10.5,10.5 0 0 1 12.5,40 Z" fill="url(#beam)"/>
+      <circle cx="22" cy="44" r="7" fill="#E8A13D" stroke="#0B1220" stroke-width="2.5"/>
+      <circle cx="22" cy="44" r="2.3" fill="#0B1220"/>
     </svg>`;
   rider=new maplibregl.Marker({
     element:el, rotationAlignment:'map', pitchAlignment:'map'
