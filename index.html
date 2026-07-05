@@ -164,6 +164,25 @@
     content:''; display:inline-block; width:5px; height:5px; border-radius:50%;
     background:var(--saffron); margin-right:6px; vertical-align:1px;
   }
+  .lmk{
+    font-family:var(--mono); font-size:10px; letter-spacing:.14em;
+    color:var(--snow); background:rgba(11,18,32,.62);
+    border:1px solid var(--line); border-radius:6px;
+    padding:3px 8px; white-space:nowrap; backdrop-filter:blur(4px);
+  }
+  .lmk::before{ content:''; display:inline-block; margin-right:7px; }
+  .lmk.border::before{
+    width:2px; height:9px; background:var(--stone);
+    box-shadow:4px 0 0 var(--stone); margin-right:11px; vertical-align:-1px;
+  }
+  .lmk.water::before{
+    width:6px; height:6px; border-radius:50%; background:#7FB3C8; vertical-align:1px;
+  }
+  .lmk.peak{ border-color:rgba(232,161,61,.55); }
+  .lmk.peak::before{
+    width:0; height:0; border-left:5px solid transparent;
+    border-right:5px solid transparent; border-bottom:8px solid var(--saffron);
+  }
 
   /* ---------- loading ---------- */
   #boot{
@@ -472,11 +491,24 @@ function maybeInit(){
     element:el, rotationAlignment:'map', pitchAlignment:'map'
   }).setLngLat([ROUTE[0][0],ROUTE[0][1]]).addTo(map);
 
-  [0,5,10,11,14,17,19,20].forEach(a=>{
+  [0,5,11,14,17,20].forEach(a=>{
     const s=STAGES.find(x=>x.a===a); if(!s) return;
     const w=document.createElement('div'); w.className='waypt'; w.textContent=s.name.toUpperCase();
     new maplibregl.Marker({element:w, anchor:'left', offset:[10,0]})
       .setLngLat([ANCHORS[a][0],ANCHORS[a][1]]).addTo(map);
+  });
+
+  const LANDMARKS=[
+    { lng:83.4163, lat:27.4980, label:'INDO\u2013NEPAL BORDER',      cls:'border' },
+    { lng:85.9660, lat:27.9830, label:'NEPAL\u2013CHINA BORDER',     cls:'border' },
+    { lng:81.4600, lat:30.6600, label:'LAKE MANASAROVAR',            cls:'water'  },
+    { lng:81.2200, lat:30.6400, label:'LAKE RAKSHASTAL',             cls:'water'  },
+    { lng:81.3119, lat:31.0675, label:'MOUNT KAILASH \u00b7 6,638 M', cls:'peak' }
+  ];
+  LANDMARKS.forEach(L=>{
+    const w=document.createElement('div'); w.className='lmk '+L.cls; w.textContent=L.label;
+    new maplibregl.Marker({element:w, anchor:'left', offset:[10,0]})
+      .setLngLat([L.lng,L.lat]).addTo(map);
   });
 
   setBoot(1);
@@ -522,7 +554,7 @@ function setProgress(d){
   const frac=Math.max(0.0001, d/TOTAL);
   map.setPaintProperty('route-line','line-gradient',
     ['step',['line-progress'],'#E8A13D',frac,'rgba(232,161,61,0.18)']);
-  if(rider){ rider.setLngLat([p.lng,p.lat]); rider.setRotation(p.brg); }
+  if(rider){ rider.setLngLat([p.lng,p.lat]); rider.setRotation(bearingAt(d)); }
   altVal.textContent=Math.round(p.ele).toLocaleString('en-IN');
   placeVal.textContent=STAGES[stageForDist(d)].name;
   drawProfile(frac);
@@ -534,12 +566,17 @@ const rideBtn=document.getElementById('rideBtn');
 const rideGlyph=document.getElementById('rideGlyph');
 const rideLabel=document.getElementById('rideLabel');
 let riding=false, raf=null, lastT=null, smoothBrg=null;
-let camPos=null, pitchS=null, zoomS=null, speedS=null;
+let camPos=null, pitchS=null, zoomS=null, speedS=null, brgVel=0;
 const KM_PER_SEC=6.5;
 const LOOKAHEAD=0.6;        // km the camera "eyes" look up the road
 const MAX_TURN=55;          // deg/sec cap on camera rotation
 
 function angDiff(a,b){ return ((a-b+540)%360)-180; }
+
+function bearingAt(d, win=0.12){
+  const a=pointAt(Math.max(0,d-win/2)), b=pointAt(Math.min(TOTAL,d+win/2));
+  return bearing([a.lng,a.lat],[b.lng,b.lat]);
+}
 
 function stepRide(t){
   if(!riding) return;
@@ -558,17 +595,20 @@ function stepRide(t){
   if(d>=TOTAL) d=TOTAL;
   const p=setProgress(d);
 
-  // look-ahead bearing: aim at a point up the road, not the local segment
-  let brgT=p.brg;
+  // look-ahead bearing, scaled with speed (faster -> eyes further up the road)
+  const look=Math.max(0.35, LOOKAHEAD*(speedS/KM_PER_SEC));
+  let brgT=bearingAt(d);
   if(d+0.05<TOTAL){
-    const look=pointAt(Math.min(TOTAL,d+LOOKAHEAD));
-    brgT=bearing([p.lng,p.lat],[look.lng,look.lat]);
+    const lp=pointAt(Math.min(TOTAL,d+look));
+    brgT=bearing([p.lng,p.lat],[lp.lng,lp.lat]);
   }
-  if(smoothBrg===null) smoothBrg=brgT;
-  let dB=angDiff(brgT,smoothBrg)*Math.min(1,dt*1.8);
-  const cap=MAX_TURN*dt;
-  dB=Math.max(-cap,Math.min(cap,dB));
-  smoothBrg=(smoothBrg+dB+360)%360;
+  if(smoothBrg===null){ smoothBrg=brgT; brgVel=0; }
+  // critically damped spring: turns ease in and ease out, never snap
+  const W0=1.7;
+  const err=angDiff(brgT,smoothBrg);
+  brgVel+=(W0*W0*err - 2*W0*brgVel)*dt;
+  brgVel=Math.max(-MAX_TURN,Math.min(MAX_TURN,brgVel));
+  smoothBrg=(smoothBrg+brgVel*dt+360)%360;
 
   // camera trails the bike on a damped spring
   if(camPos===null) camPos={lng:p.lng,lat:p.lat};
@@ -595,7 +635,7 @@ function startRide(){
   }
   if(currentDist>=TOTAL) setProgress(0);
   riding=true; lastT=null; smoothBrg=null;
-  camPos=null; pitchS=null; zoomS=null; speedS=null;
+  camPos=null; pitchS=null; zoomS=null; speedS=null; brgVel=0;
   rideGlyph.textContent='❚❚'; rideLabel.textContent='Pause';
   rideBtn.setAttribute('aria-pressed','true');
   raf=requestAnimationFrame(stepRide);
