@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Kailash by Road — Sadhguru's Motorcycle Yatra · 2025 Route</title>
+<meta name="description" content="Ride the 2025 route: Gorakhpur to Lake Manasarovar across Nepal and the Tibetan plateau. A cinematic replay of Sadhguru's motorcycle yatra to Kailash." />
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/4.7.1/maplibre-gl.min.css" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Marcellus&family=Karla:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --ink:        #0B1220;   /* himalayan night */
+    --mist:       rgba(11,18,32,.78);
+    --mist-soft:  rgba(11,18,32,.55);
+    --snow:       #F2EFE7;   /* warm snow */
+    --stone:      #97A0B0;   /* muted caption */
+    --saffron:    #E8A13D;   /* marigold accent */
+    --ochre:      #B0492F;   /* monastery red, sparse */
+    --line:       rgba(242,239,231,.14);
+    --display: 'Marcellus', serif;
+    --body: 'Karla', sans-serif;
+    --mono: 'IBM Plex Mono', monospace;
+  }
+  *{ margin:0; padding:0; box-sizing:border-box; }
+  html,body{ height:100%; }
+  body{
+    font-family:var(--body); color:var(--snow); background:var(--ink);
+    overflow:hidden;
+  }
+  #map{ position:fixed; inset:0; }
+  #map canvas{ outline:none; }
+
+  /* ---------- vignette so chrome sits legibly on satellite ---------- */
+  .vignette{
+    position:fixed; inset:0; pointer-events:none; z-index:2;
+    background:
+      linear-gradient(180deg, rgba(11,18,32,.62) 0%, rgba(11,18,32,0) 22%),
+      linear-gradient(0deg,   rgba(11,18,32,.78) 0%, rgba(11,18,32,0) 30%),
+      linear-gradient(90deg,  rgba(11,18,32,.55) 0%, rgba(11,18,32,0) 34%);
+  }
+
+  /* ---------- masthead ---------- */
+  header{
+    position:fixed; top:0; left:0; right:0; z-index:10;
+    display:flex; align-items:flex-start; justify-content:space-between;
+    padding:22px 26px 0;
+    pointer-events:none;
+  }
+  header > *{ pointer-events:auto; }
+  .mast .eyebrow{
+    font-family:var(--mono); font-size:11px; letter-spacing:.22em;
+    text-transform:uppercase; color:var(--saffron); margin-bottom:6px;
+  }
+  .mast h1{
+    font-family:var(--display); font-weight:400; font-size:clamp(26px,3.4vw,40px);
+    letter-spacing:.04em; line-height:1.05;
+  }
+  .mast .sub{ font-size:13px; color:var(--stone); margin-top:6px; max-width:46ch; }
+  .replay-badge{
+    display:inline-block; margin-top:10px; padding:4px 10px;
+    border:1px solid var(--line); border-radius:999px;
+    font-family:var(--mono); font-size:10.5px; letter-spacing:.14em;
+    text-transform:uppercase; color:var(--stone); background:var(--mist-soft);
+    backdrop-filter:blur(6px);
+  }
+
+  .ride-btn{
+    font-family:var(--body); font-weight:700; font-size:14px;
+    color:var(--ink); background:var(--saffron);
+    border:none; border-radius:999px; padding:12px 22px; cursor:pointer;
+    display:flex; align-items:center; gap:9px;
+    box-shadow:0 6px 24px rgba(232,161,61,.35);
+    transition:transform .15s ease, box-shadow .15s ease;
+  }
+  .ride-btn:hover{ transform:translateY(-1px); box-shadow:0 8px 28px rgba(232,161,61,.45); }
+  .ride-btn:focus-visible{ outline:2px solid var(--snow); outline-offset:3px; }
+  .ride-btn .glyph{ font-size:12px; }
+
+  /* ---------- stage rail ---------- */
+  nav.rail{
+    position:fixed; left:26px; top:150px; bottom:150px; z-index:10;
+    width:270px; overflow-y:auto; overscroll-behavior:contain;
+    padding-right:6px;
+    scrollbar-width:thin; scrollbar-color:rgba(242,239,231,.2) transparent;
+  }
+  .stage{
+    display:block; width:100%; text-align:left; cursor:pointer;
+    background:var(--mist-soft); backdrop-filter:blur(8px);
+    border:1px solid var(--line); border-radius:10px;
+    padding:11px 13px; margin-bottom:8px; color:var(--snow);
+    transition:border-color .2s ease, background .2s ease;
+  }
+  .stage:hover{ border-color:rgba(232,161,61,.5); }
+  .stage:focus-visible{ outline:2px solid var(--saffron); outline-offset:2px; }
+  .stage.active{ background:var(--mist); border-color:var(--saffron); }
+  .stage .alt{
+    font-family:var(--mono); font-size:10.5px; letter-spacing:.12em;
+    color:var(--saffron);
+  }
+  .stage .name{
+    font-family:var(--display); font-size:16.5px; letter-spacing:.02em; margin-top:2px;
+  }
+  .stage .note{ font-size:12px; color:var(--stone); margin-top:3px; line-height:1.45; }
+
+  /* ---------- altitude ribbon (signature) ---------- */
+  footer.ribbon{
+    position:fixed; left:0; right:0; bottom:0; z-index:10;
+    padding:14px 26px 18px;
+    background:linear-gradient(0deg, rgba(11,18,32,.92) 30%, rgba(11,18,32,0));
+    pointer-events:none;
+  }
+  .ribbon-inner{ display:flex; align-items:flex-end; gap:22px; pointer-events:auto; }
+  #profile{ flex:1; height:74px; display:block; }
+  .altitude{
+    text-align:right; min-width:170px;
+  }
+  .altitude .label{
+    font-family:var(--mono); font-size:10.5px; letter-spacing:.2em;
+    text-transform:uppercase; color:var(--stone);
+  }
+  .altitude .value{
+    font-family:var(--mono); font-weight:500; font-size:clamp(28px,3vw,38px);
+    color:var(--snow); line-height:1.1; font-variant-numeric:tabular-nums;
+  }
+  .altitude .value .unit{ font-size:15px; color:var(--saffron); }
+  .altitude .place{
+    font-family:var(--display); font-size:14px; color:var(--stone);
+    letter-spacing:.03em; margin-top:2px; min-height:18px;
+  }
+
+  /* ---------- rider marker ---------- */
+  .rider{ width:18px; height:18px; position:relative; }
+  .rider .core{
+    position:absolute; inset:4px; border-radius:50%;
+    background:var(--saffron); border:2px solid var(--ink);
+  }
+  .rider .pulse{
+    position:absolute; inset:0; border-radius:50%;
+    border:2px solid var(--saffron); opacity:.9;
+    animation:pulse 2.2s ease-out infinite;
+  }
+  @keyframes pulse{
+    0%{ transform:scale(.6); opacity:.9; }
+    100%{ transform:scale(2.1); opacity:0; }
+  }
+  .waypt{
+    font-family:var(--mono); font-size:10px; letter-spacing:.1em;
+    color:var(--snow); background:var(--mist);
+    border:1px solid var(--line); border-radius:6px;
+    padding:3px 7px; white-space:nowrap; backdrop-filter:blur(4px);
+  }
+  .waypt::before{
+    content:''; display:inline-block; width:5px; height:5px; border-radius:50%;
+    background:var(--saffron); margin-right:6px; vertical-align:1px;
+  }
+
+  /* ---------- loading ---------- */
+  #boot{
+    position:fixed; inset:0; z-index:50; background:var(--ink);
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    gap:14px; transition:opacity .8s ease;
+  }
+  #boot.gone{ opacity:0; pointer-events:none; }
+  #boot .om{ font-family:var(--display); font-size:44px; color:var(--saffron); }
+  #boot p{ font-family:var(--mono); font-size:12px; letter-spacing:.2em;
+    text-transform:uppercase; color:var(--stone); }
+
+  /* ---------- responsive ---------- */
+  @media (max-width: 860px){
+    header{ padding:16px 16px 0; flex-direction:column; gap:12px; }
+    .mast .sub{ display:none; }
+    nav.rail{
+      left:0; right:0; top:auto; bottom:118px; width:auto;
+      display:flex; gap:8px; overflow-x:auto; overflow-y:hidden;
+      padding:0 16px;
+    }
+    .stage{ min-width:200px; margin-bottom:0; }
+    footer.ribbon{ padding:10px 16px 12px; }
+    #profile{ height:48px; }
+    .altitude{ min-width:120px; }
+  }
+  @media (prefers-reduced-motion: reduce){
+    .rider .pulse{ animation:none; opacity:0; }
+  }
+</style>
+</head>
+<body>
+
+<div id="boot" aria-hidden="true">
+  <div class="om">ॐ</div>
+  <p>Loading the mountain</p>
+</div>
+
+<div id="map" role="application" aria-label="3D map of the 2025 Kailash motorcycle yatra route"></div>
+<div class="vignette"></div>
+
+<header>
+  <div class="mast">
+    <div class="eyebrow">Sadhguru · Motorcycle Yatra</div>
+    <h1>Kailash by Road</h1>
+    <p class="sub">Gorakhpur to Lake Manasarovar — 1,400&nbsp;km through monsoon Nepal and over the Tibetan plateau, from 84&nbsp;m to a 5,216&nbsp;m pass.</p>
+    <span class="replay-badge">Replay · 2025 route · Live returns Aug 2026</span>
+  </div>
+  <button class="ride-btn" id="rideBtn" aria-pressed="false">
+    <span class="glyph" id="rideGlyph">▶</span><span id="rideLabel">Ride the route</span>
+  </button>
+</header>
+
+<nav class="rail" id="rail" aria-label="Stages of the yatra"></nav>
+
+<footer class="ribbon">
+  <div class="ribbon-inner">
+    <canvas id="profile" aria-hidden="true"></canvas>
+    <div class="altitude">
+      <div class="label">Altitude</div>
+      <div class="value"><span id="altVal">84</span> <span class="unit">M</span></div>
+      <div class="place" id="placeVal">Gorakhpur, Uttar Pradesh</div>
+    </div>
+  </div>
+</footer>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/maplibre-gl/4.7.1/maplibre-gl.min.js"></script>
+<script>
+/* ============================================================
+   KAILASH BY ROAD — 2025 route replay
+   Route is a hand-plotted approximation of the ridden highways.
+   To use exact GPX later: replace ROUTE with [lng, lat, ele] rows.
+   ============================================================ */
+
+const ROUTE = [
+  // --- India: Gorakhpur -> Sunauli (NH-727) ---
+  [83.3732,26.7606,84],[83.3550,26.8600,86],[83.3050,26.9900,88],
+  [83.2950,27.1300,92],[83.3200,27.2600,95],[83.3600,27.3900,98],
+  [83.4000,27.4600,100],[83.4163,27.5057,100],
+  // --- Nepal border: Bhairahawa -> Butwal ---
+  [83.4509,27.5330,109],[83.4480,27.6200,125],[83.4484,27.7006,150],
+  // --- East along H01 to Narayanghat, monsoon stretch ---
+  [83.5600,27.6900,180],[83.7200,27.6700,195],[83.8800,27.6500,200],
+  [84.0500,27.6350,205],[84.2200,27.6500,210],[84.3500,27.6700,215],
+  [84.4300,27.6900,208],
+  // --- Trishuli valley: Narayanghat -> Mugling -> Kathmandu ---
+  [84.4800,27.7800,235],[84.5630,27.8570,240],[84.6500,27.8700,300],
+  [84.8300,27.8100,415],[84.9800,27.8300,520],[85.0900,27.8000,720],
+  [85.1500,27.7700,940],[85.2000,27.6900,1500],[85.3240,27.7172,1350],
+  // --- Valley towns ---
+  [85.4298,27.6710,1400],[85.5417,27.6221,1550],
+  // --- Araniko Highway: down to Sun Koshi, up the Bhote Koshi gorge ---
+  [85.6300,27.6350,900],[85.7100,27.6400,650],[85.7700,27.7300,760],
+  [85.8300,27.7800,820],[85.9000,27.7900,900],[85.9300,27.8800,1250],
+  [85.9610,27.9737,1770],
+  // --- Zhangmu border post, the climb to Nyalam ---
+  [85.9800,27.9910,2300],[85.9700,28.0600,3000],[85.9820,28.1550,3750],
+  // --- Onto the plateau: Tong La country, Peiku Tso ---
+  [85.9800,28.3500,4800],[85.8500,28.5500,5050],[85.6500,28.7500,4600],
+  [85.6000,28.9000,4590],[85.3500,29.1000,4620],[85.2500,29.2500,4630],
+  // --- Saga ---
+  [85.2325,29.3288,4640],
+  // --- West along G219: Zhongba, Paryang ---
+  [84.9000,29.4500,4700],[84.5500,29.6000,4600],[84.2500,29.7000,4580],
+  [84.0300,29.7700,4570],[83.7500,29.9000,4590],[83.4500,30.0700,4610],
+  // --- Mayum La, the high point ---
+  [83.0500,30.2000,4750],[82.6500,30.3000,4800],[82.3000,30.4700,5216],
+  // --- Descent to the lake ---
+  [81.9500,30.6200,4700],[81.7500,30.7500,4560],[81.5500,30.7200,4585],
+  // --- Lake Manasarovar (Chiu side), then Darchen beneath Kailash ---
+  [81.3000,30.7800,4590],[81.2900,30.9800,4675]
+];
+
+const STAGES = [
+  { i:0,  alt:'84 M · AUG 9',    name:'Gorakhpur',          note:'Flag-off from the Uttar Pradesh plains.', zoom:10.5, pitch:55, bearing:0 },
+  { i:7,  alt:'100 M',           name:'Sunauli — Bhairahawa', note:'Crossing into Nepal at the land border.', zoom:11, pitch:55, bearing:10 },
+  { i:10, alt:'150 M',           name:'Butwal',             note:'Rain-soaked, under-construction monsoon roads begin.', zoom:11, pitch:58, bearing:60 },
+  { i:18, alt:'240 M',           name:'Mugling',            note:'Up the Trishuli valley on the Prithvi Highway.', zoom:10.8, pitch:60, bearing:70 },
+  { i:25, alt:'1,350 M',         name:'Kathmandu',          note:'Through the capital and the valley.', zoom:11.2, pitch:55, bearing:90 },
+  { i:27, alt:'1,550 M',         name:'Bhaktapur — Dhulikhel', note:'The old towns at the valley rim.', zoom:11.5, pitch:58, bearing:80 },
+  { i:33, alt:'1,770 M',         name:'Bhote Koshi Gorge',  note:'The Araniko Highway climbs a monsoon gorge to the frontier.', zoom:10.8, pitch:62, bearing:20 },
+  { i:34, alt:'2,300 M',         name:'Zhangmu',            note:'Entering Tibet by road — no flights, no helicopters.', zoom:11.5, pitch:62, bearing:0 },
+  { i:36, alt:'3,750 M',         name:'Nyalam',             note:'The wall of the Himalaya, climbed in switchbacks.', zoom:10.8, pitch:63, bearing:355 },
+  { i:38, alt:'5,050 M',         name:'Tong La',            note:'Onto the plateau. Thin air, open sky.', zoom:9.8, pitch:60, bearing:320 },
+  { i:43, alt:'4,640 M',         name:'Saga',               note:'Across the Yarlung Tsangpo, west along G219.', zoom:10.2, pitch:58, bearing:290 },
+  { i:49, alt:'4,610 M',         name:'Paryang',            note:'The long plateau run.', zoom:9.8, pitch:58, bearing:285 },
+  { i:52, alt:'5,216 M',         name:'Mayum La',           note:'The highest point of the ride.', zoom:10, pitch:62, bearing:290 },
+  { i:56, alt:'4,590 M',         name:'Lake Manasarovar',   note:'The ride concludes at the lake.', zoom:10.5, pitch:60, bearing:300 },
+  { i:57, alt:'4,675 M',         name:'Darchen · Kailash',  note:'Beneath the mountain. The trek begins where the road ends.', zoom:10.8, pitch:65, bearing:340 }
+];
+
+const PLACES = STAGES.map(s => ({ i:s.i, name:s.name }));
+const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/* ---------- geometry helpers ---------- */
+const R = 6371;
+function hav(a, b){
+  const dLat=(b[1]-a[1])*Math.PI/180, dLng=(b[0]-a[0])*Math.PI/180;
+  const la1=a[1]*Math.PI/180, la2=b[1]*Math.PI/180;
+  const h=Math.sin(dLat/2)**2 + Math.cos(la1)*Math.cos(la2)*Math.sin(dLng/2)**2;
+  return 2*R*Math.asin(Math.sqrt(h));
+}
+function bearing(a, b){
+  const la1=a[1]*Math.PI/180, la2=b[1]*Math.PI/180, dLng=(b[0]-a[0])*Math.PI/180;
+  const y=Math.sin(dLng)*Math.cos(la2);
+  const x=Math.cos(la1)*Math.sin(la2)-Math.sin(la1)*Math.cos(la2)*Math.cos(dLng);
+  return (Math.atan2(y,x)*180/Math.PI+360)%360;
+}
+const CUM=[0];
+for(let i=1;i<ROUTE.length;i++) CUM.push(CUM[i-1]+hav(ROUTE[i-1],ROUTE[i]));
+const TOTAL=CUM[CUM.length-1];
+
+function pointAt(d){
+  d=Math.max(0,Math.min(TOTAL,d));
+  let i=1; while(i<CUM.length-1 && CUM[i]<d) i++;
+  const t=(d-CUM[i-1])/((CUM[i]-CUM[i-1])||1e-9);
+  const a=ROUTE[i-1], b=ROUTE[i];
+  return {
+    lng:a[0]+(b[0]-a[0])*t, lat:a[1]+(b[1]-a[1])*t,
+    ele:a[2]+(b[2]-a[2])*t, brg:bearing(a,b), seg:i
+  };
+}
+function nearestPlace(seg){
+  let best=PLACES[0];
+  for(const p of PLACES){ if(p.i<=seg) best=p; }
+  return best.name;
+}
+
+/* ---------- map ---------- */
+const map = new maplibregl.Map({
+  container:'map',
+  center:[83.3732,26.7606], zoom:10.5, pitch:55, bearing:0,
+  maxPitch:75, attributionControl:{compact:true},
+  style:{
+    version:8,
+    sources:{
+      sat:{
+        type:'raster', tileSize:256, maxzoom:17,
+        tiles:['https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'],
+        attribution:'Imagery © Esri, Maxar, Earthstar Geographics · Terrain © Mapzen/AWS'
+      },
+      dem:{
+        type:'raster-dem', tileSize:256, maxzoom:13, encoding:'terrarium',
+        tiles:['https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png']
+      }
+    },
+    layers:[
+      { id:'bg', type:'background', paint:{ 'background-color':'#0B1220' } },
+      { id:'sat', type:'raster', source:'sat',
+        paint:{ 'raster-saturation':-0.12, 'raster-contrast':0.06, 'raster-brightness-max':0.94 } }
+    ],
+    sky:{
+      'sky-color':'#0E1B33','horizon-color':'#3A4A66','fog-color':'#0B1220',
+      'sky-horizon-blend':0.6,'horizon-fog-blend':0.55,
+      'atmosphere-blend':['interpolate',['linear'],['zoom'],2,0.4,8,0.7,12,0.85]
+    }
+  }
+});
+map.addControl(new maplibregl.NavigationControl({visualizePitch:true}),'bottom-right');
+
+let rider;
+
+map.on('load',()=>{
+  map.setTerrain({ source:'dem', exaggeration:1.35 });
+
+  map.addSource('route',{
+    type:'geojson', lineMetrics:true,
+    data:{ type:'Feature', geometry:{ type:'LineString',
+      coordinates:ROUTE.map(p=>[p[0],p[1]]) } }
+  });
+  map.addLayer({ id:'route-casing', type:'line', source:'route',
+    layout:{ 'line-cap':'round','line-join':'round' },
+    paint:{ 'line-color':'#0B1220','line-width':7,'line-opacity':0.55,'line-blur':1 } });
+  map.addLayer({ id:'route-line', type:'line', source:'route',
+    layout:{ 'line-cap':'round','line-join':'round' },
+    paint:{ 'line-width':4,
+      'line-gradient':['step',['line-progress'],'#E8A13D',0.0001,'rgba(232,161,61,0.18)'] } });
+
+  // rider marker
+  const el=document.createElement('div'); el.className='rider';
+  el.innerHTML='<div class="pulse"></div><div class="core"></div>';
+  rider=new maplibregl.Marker({element:el}).setLngLat([ROUTE[0][0],ROUTE[0][1]]).addTo(map);
+
+  // waypoint labels (key anchors only, to keep the map quiet)
+  [0,7,25,34,36,43,52,56,57].forEach(i=>{
+    const s=STAGES.find(x=>x.i===i); if(!s) return;
+    const w=document.createElement('div'); w.className='waypt'; w.textContent=s.name.toUpperCase();
+    new maplibregl.Marker({element:w, anchor:'left', offset:[10,0]})
+      .setLngLat([ROUTE[i][0],ROUTE[i][1]]).addTo(map);
+  });
+
+  document.getElementById('boot').classList.add('gone');
+  drawProfile(0);
+});
+
+/* ---------- stage rail ---------- */
+const rail=document.getElementById('rail');
+STAGES.forEach((s,idx)=>{
+  const b=document.createElement('button');
+  b.className='stage'; b.dataset.idx=idx;
+  b.innerHTML=`<div class="alt">${s.alt}</div><div class="name">${s.name}</div><div class="note">${s.note}</div>`;
+  b.addEventListener('click',()=>goToStage(idx,true));
+  rail.appendChild(b);
+});
+function setActiveStage(idx){
+  rail.querySelectorAll('.stage').forEach((el,i)=>el.classList.toggle('active',i===idx));
+}
+function stageForDist(d){
+  let idx=0;
+  STAGES.forEach((s,k)=>{ if(CUM[s.i]<=d+0.5) idx=k; });
+  return idx;
+}
+function goToStage(idx,userInitiated){
+  stopRide();
+  const s=STAGES[idx];
+  setActiveStage(idx);
+  setProgress(CUM[s.i]);
+  const opts={ center:[ROUTE[s.i][0],ROUTE[s.i][1]], zoom:s.zoom, pitch:s.pitch, bearing:s.bearing };
+  if(reduceMotion){ map.jumpTo(opts); } else { map.flyTo({...opts, duration:2600, essential:true}); }
+}
+
+/* ---------- progress state ---------- */
+const altVal=document.getElementById('altVal');
+const placeVal=document.getElementById('placeVal');
+let currentDist=0;
+
+function setProgress(d){
+  currentDist=d;
+  const p=pointAt(d);
+  const frac=Math.max(0.0001, d/TOTAL);
+  map.setPaintProperty('route-line','line-gradient',
+    ['step',['line-progress'],'#E8A13D',frac,'rgba(232,161,61,0.18)']);
+  if(rider) rider.setLngLat([p.lng,p.lat]);
+  altVal.textContent=Math.round(p.ele).toLocaleString('en-IN');
+  placeVal.textContent=nearestPlace(p.seg);
+  drawProfile(frac);
+  return p;
+}
+
+/* ---------- ride mode ---------- */
+const rideBtn=document.getElementById('rideBtn');
+const rideGlyph=document.getElementById('rideGlyph');
+const rideLabel=document.getElementById('rideLabel');
+let riding=false, raf=null, lastT=null, smoothBrg=null;
+const KM_PER_SEC=6.5;               // ~3.5 min end to end
+
+function stepRide(t){
+  if(!riding) return;
+  if(lastT===null) lastT=t;
+  const dt=(t-lastT)/1000; lastT=t;
+  let d=currentDist+dt*KM_PER_SEC;
+  if(d>=TOTAL){ d=TOTAL; }
+  const p=setProgress(d);
+  // smooth the bearing so gorge switchbacks don't whip the camera
+  if(smoothBrg===null) smoothBrg=p.brg;
+  let diff=((p.brg-smoothBrg+540)%360)-180;
+  smoothBrg=(smoothBrg+diff*Math.min(1,dt*1.4)+360)%360;
+  const highPlateau=p.ele>4200;
+  map.jumpTo({
+    center:[p.lng,p.lat],
+    bearing:smoothBrg,
+    pitch:highPlateau?58:64,
+    zoom:highPlateau?10.2:11.3
+  });
+  setActiveStage(stageForDist(d));
+  if(d>=TOTAL){ stopRide(); return; }
+  raf=requestAnimationFrame(stepRide);
+}
+function startRide(){
+  if(reduceMotion){                  // no continuous camera motion: step stages
+    const next=(stageForDist(currentDist)+1)%STAGES.length;
+    goToStage(next,false); return;
+  }
+  if(currentDist>=TOTAL) setProgress(0);
+  riding=true; lastT=null; smoothBrg=null;
+  rideGlyph.textContent='❚❚'; rideLabel.textContent='Pause';
+  rideBtn.setAttribute('aria-pressed','true');
+  raf=requestAnimationFrame(stepRide);
+}
+function stopRide(){
+  riding=false; if(raf) cancelAnimationFrame(raf);
+  rideGlyph.textContent='▶'; rideLabel.textContent='Ride the route';
+  rideBtn.setAttribute('aria-pressed','false');
+}
+rideBtn.addEventListener('click',()=>{ riding?stopRide():startRide(); });
+
+/* ---------- elevation ribbon ---------- */
+const canvas=document.getElementById('profile');
+const ctx=canvas.getContext('2d');
+function drawProfile(frac){
+  const dpr=window.devicePixelRatio||1;
+  const w=canvas.clientWidth, h=canvas.clientHeight;
+  if(canvas.width!==w*dpr){ canvas.width=w*dpr; canvas.height=h*dpr; }
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.clearRect(0,0,w,h);
+  const maxE=5400, pad=2;
+  const X=d=>pad+(d/TOTAL)*(w-2*pad);
+  const Y=e=>h-4-(e/maxE)*(h-10);
+
+  // full profile, quiet
+  ctx.beginPath(); ctx.moveTo(X(0),Y(ROUTE[0][2]));
+  for(let i=1;i<ROUTE.length;i++) ctx.lineTo(X(CUM[i]),Y(ROUTE[i][2]));
+  ctx.strokeStyle='rgba(242,239,231,0.28)'; ctx.lineWidth=1.5; ctx.stroke();
+
+  // ridden portion, saffron fill
+  const dNow=frac*TOTAL;
+  ctx.beginPath(); ctx.moveTo(X(0),h);
+  ctx.lineTo(X(0),Y(ROUTE[0][2]));
+  for(let i=1;i<ROUTE.length && CUM[i]<=dNow;i++) ctx.lineTo(X(CUM[i]),Y(ROUTE[i][2]));
+  const pNow=pointAt(dNow);
+  ctx.lineTo(X(dNow),Y(pNow.ele)); ctx.lineTo(X(dNow),h); ctx.closePath();
+  const g=ctx.createLinearGradient(0,0,0,h);
+  g.addColorStop(0,'rgba(232,161,61,0.55)'); g.addColorStop(1,'rgba(232,161,61,0.08)');
+  ctx.fillStyle=g; ctx.fill();
+
+  // position tick
+  ctx.beginPath(); ctx.arc(X(dNow),Y(pNow.ele),3.5,0,7);
+  ctx.fillStyle='#E8A13D'; ctx.fill();
+  ctx.lineWidth=1.5; ctx.strokeStyle='#0B1220'; ctx.stroke();
+}
+window.addEventListener('resize',()=>drawProfile(currentDist/TOTAL));
+
+/* ---------- init ---------- */
+setActiveStage(0);
+
+</script>
+</body>
+</html>
